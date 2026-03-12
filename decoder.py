@@ -53,7 +53,7 @@ print(np.round(pesos_atencao, 4))
 print("\nValidação — triângulo superior é estritamente 0.0?", 
       np.all(np.triu(pesos_atencao, k=1) == 0.0))
 
-# ── Tarefa 2: Cross-Attention (Ponte Encoder-Decoder) ─────────────────────────
+# Tarefa 2: Cross-Attention (Ponte Encoder-Decoder) 
 
 D_MODEL_CROSS = 512
 SEQ_LEN_FRANCES = 10
@@ -105,3 +105,54 @@ print(f"Shape decoder_state  : {decoder_state.shape}")
 print(f"Shape saída cross    : {saida_cross.shape}")
 print(f"\nValidação — shape esperado (1, {SEQ_LEN_INGLES}, {D_MODEL_CROSS})?",
       saida_cross.shape == (BATCH_SIZE, SEQ_LEN_INGLES, D_MODEL_CROSS))
+
+# Tarefa 3: Loop de Inferência Auto-Regressivo
+
+TAMANHO_VOCABULARIO = 10_000
+TOKEN_EOS = "<EOS>"
+
+vocabulario_ficticio = [f"palavra_{i}" for i in range(TAMANHO_VOCABULARIO - 1)]
+vocabulario_ficticio.append(TOKEN_EOS)
+
+
+def generate_next_token(
+    sequencia_atual: list, encoder_out: np.ndarray
+) -> np.ndarray:
+    comprimento_atual = len(sequencia_atual)
+    estado_decoder = np.random.randn(BATCH_SIZE, comprimento_atual, D_MODEL_CROSS)
+
+    saida_atencao = cross_attention(encoder_out, estado_decoder)
+
+    vetor_final = saida_atencao[0, -1, :]
+    W_projecao = np.random.randn(D_MODEL_CROSS, TAMANHO_VOCABULARIO)
+    logits = vetor_final @ W_projecao
+    probabilidades = softmax(logits.reshape(1, -1)).flatten()
+
+    return probabilidades
+
+
+# Loop de inferência
+sequencia_gerada = ["<START>"]
+encoder_out_simulado = np.random.randn(BATCH_SIZE, SEQ_LEN_FRANCES, D_MODEL_CROSS)
+MAX_TOKENS = 20
+
+print("\n" + "=" * 55)
+print("  Tarefa 3 — Loop de Inferência Auto-Regressivo")
+print("=" * 55)
+print(f"\nSequência inicial: {sequencia_gerada}\n")
+
+while len(sequencia_gerada) <= MAX_TOKENS:
+    probabilidades = generate_next_token(sequencia_gerada, encoder_out_simulado)
+    indice_proximo = np.argmax(probabilidades)
+    proximo_token = vocabulario_ficticio[indice_proximo]
+
+    sequencia_gerada.append(proximo_token)
+    print(f"  Passo {len(sequencia_gerada) - 1:02d} — token gerado: '{proximo_token}'")
+
+    if proximo_token == TOKEN_EOS:
+        print(f"\nToken <EOS> detectado! Geração encerrada.")
+        break
+
+print(f"\nFrase final gerada:")
+print(" ".join(sequencia_gerada))
+print("=" * 55)
